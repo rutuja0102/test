@@ -1,5 +1,3 @@
-# test
-
 # Client Onboarding — Complete Flow Documentation
 
 ## Overview
@@ -52,8 +50,6 @@ client_new_investments        ← intended new investments (single row)
 client_goals                  ← one row per goal (multi-row)
 client_loans                  ← one row per loan (multi-row)
 client_insurance_policies     ← one row per policy (multi-row)
-client_insurance_meta         ← life cover, retirement corpus, will status (single row)
-client_retirement_plan        ← retirement projection inputs (single row)
 client_tax_details            ← tax regime, deductions (single row)
 client_rm_data                ← RM-side data filled post-handoff (single row)
 ```
@@ -276,38 +272,3 @@ flowchart TD
     U --> V([Client Onboarded])
 ```
 
----
-
-### Token Exchange Detail (Path B only)
-
-```mermaid
-sequenceDiagram
-    participant C as Client Browser
-    participant FE as Next.js Frontend
-    participant BE as FastAPI Backend
-    participant DB as PostgreSQL
-
-    C->>FE: Opens /client-form/{url_token}
-    FE->>BE: POST /api/v1/client-form-onboarding/{url_token}/session
-    BE->>DB: SELECT client_verification_request WHERE token = url_token
-    DB-->>BE: record (token_expiry, is_verified, onboarding_id, client_id)
-    BE->>BE: Validate: not expired, not already verified
-    BE->>BE: create_client_form_token(onboarding_id)\nJWT { sub: onboarding_id, role: client_form, exp: now+2h }
-    BE-->>FE: { session_token, onboarding_id, client_id, client_name }
-    FE->>FE: setApiToken(session_token)\nStore onboarding_id + client_id in Zustand
-
-    Note over FE,BE: All subsequent step API calls carry session_token as Bearer
-
-    FE->>BE: PUT /api/v1/onboarding/{onboarding_id}/personal\nAuthorization: Bearer session_token
-    BE->>BE: require_participant: role=client_form ✓
-    BE->>DB: UPDATE client_personal_details
-    DB-->>BE: updated record
-    BE-->>FE: 200 OK
-
-    Note over FE,BE: ...client fills all steps...
-
-    FE->>BE: POST /api/v1/client-form-onboarding/{url_token}/complete
-    BE->>DB: UPDATE client_verification_request SET is_verified=true
-    BE-->>FE: { message: "Form submitted successfully" }
-    FE->>FE: setApiToken(null) — session cleared
-```
